@@ -2,6 +2,7 @@ require 'sinatra'
 require 'sinatra/reloader'
 require 'tilt/erubis'
 require 'redcarpet'
+require 'yaml'
 
 configure do 
   enable :sessions
@@ -40,6 +41,29 @@ def data_path
   end
 end
 
+def signed_in?
+  session[:signed_in]
+end
+
+def sign_in_message
+  session[:message] = "You must be signed in to do that."
+end
+
+def load_user_credentials
+  credentials_path = if ENV["RACK_ENV"] == "test"
+    File.expand_path("../test/users.yml", __FILE__)
+  else
+    File.expand_path("../users.yml", __FILE__)
+  end
+  YAML.load_file(credentials_path)
+end
+
+def authenticate(username, password)
+  credentials = load_user_credentials
+  
+  credentials.key?(username) && credentials[username] == password
+end
+
 get '/' do
   pattern = File.join(data_path, "*")
   @files = Dir.glob(pattern).map do |path|
@@ -50,23 +74,33 @@ get '/' do
 end
 
 get '/new' do
-  erb :new
+  if signed_in?
+    erb :new
+  else
+    sign_in_message
+    redirect '/'
+  end
 end
 
 post '/create' do
-  filename = params[:filename].to_s
+  if signed_in?
+    filename = params[:filename].to_s
 
-  if filename.size == 0
-    session[:message] = "A name is required."
-    status 422
-    erb :new
+    if filename.size == 0
+      session[:message] = "A name is required."
+      status 422
+      erb :new
+    else
+      file_path = File.join(data_path, filename)
+
+      File.write(file_path, "")
+      session[:message] = "#{params[:filename]} has been created."
+
+      redirect "/"
+    end
   else
-    file_path = File.join(data_path, filename)
-
-    File.write(file_path, "")
-    session[:message] = "#{params[:filename]} has been created."
-
-    redirect "/"
+    sign_in_message
+    erb :new
   end
 end
 
@@ -82,28 +116,67 @@ get '/:filename' do
 end
 
 get '/:filename/edit' do
-  @filename = params[:filename]
-  file_path = File.join(data_path, @filename)
-  @content = File.read(file_path)
+  if signed_in?
+    @filename = params[:filename]
+    file_path = File.join(data_path, @filename)
+    @content = File.read(file_path)
 
-  erb :edit
+    erb :edit
+  else
+    sign_in_message
+    redirect '/'
+  end
 end
 
 post '/:filename/edit' do
-  file_path = @root + "/data/" + params[:filename]
+  if signed_in?
+    file_path = @root + "/data/" + params[:filename]
 
-  File.write(file_path, params[:content])
+    File.write(file_path, params[:content])
 
-  session[:message] = "#{params[:filename]} has been successfully updated."
-  redirect "/"
+    session[:message] = "#{params[:filename]} has been successfully updated."
+    redirect "/"
+  else
+    sign_in_message
+    erb :edit
+  end
 end
 
 post '/:filename/delete' do
-  @filename = params[:filename]
-  file_path = File.join(data_path, @filename)
+  if signed_in?
+    @filename = params[:filename]
+    file_path = File.join(data_path, @filename)
 
-  File.delete(file_path)
+    File.delete(file_path)
 
-  session[:message] = "#{params[:filename]} has been successfully deleted."
+    session[:message] = "#{params[:filename]} has been successfully deleted."
+    redirect "/"
+  else
+    sign_in_message
+    redirect "/"
+  end
+end
+
+get '/users/signin' do
+  erb :signin
+end
+
+post '/users/signin' do
+  if authenticate(params[:username], params[:password])
+    session[:signed_in] = true
+    session[:username] = params[:username]
+    session[:message] = "Welcome!"
+    redirect "/"
+  else
+    session[:message] = "Invalid credentials!"
+    status 422
+    erb :signin
+  end
+end
+
+post '/signout' do
+  session[:signed_in] = false
+  session[:username] = nil
+  session[:message] = "You have been signed out."
   redirect "/"
 end
