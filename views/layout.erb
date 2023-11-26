@@ -1,0 +1,18 @@
+<html>
+  <head>
+    <title>CMS</title>
+    <link rel="stylesheet" type="text/css" href="styles/cms.css"/>
+  </head>
+  <body>
+    <header>
+      <a href="/">
+        <img src="/favicon.ico"> 
+      </a>
+      <h1>CMS</h1>
+    </header>
+    <% if session[:message] %>
+      <p class="message"><%= session.delete(:message) %></p>
+    <% end %>
+    <%= yield %>
+  </body>
+</html>
