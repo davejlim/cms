@@ -3,6 +3,7 @@ require 'sinatra/reloader'
 require 'tilt/erubis'
 require 'redcarpet'
 require 'yaml'
+require 'bcrypt'
 
 configure do 
   enable :sessions
@@ -61,7 +62,12 @@ end
 def authenticate(username, password)
   credentials = load_user_credentials
   
-  credentials.key?(username) && credentials[username] == password
+  if credentials.key?(username) 
+    bcrypt_password = BCrypt::Password.new(credentials[username])
+    bcrypt_password == password
+  else
+    false
+  end
 end
 
 get '/' do

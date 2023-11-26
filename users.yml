@@ -1,5 +1,3 @@
 {
-  bill: billspassword,
-  sonia: soniaspassword,
-  admin: password
+  admin: $2a$12$tPstHAEhLgWROyYpWtUswOytwHnem8JGmLFa2kXKIPtMGdOfAHx/C
 }
